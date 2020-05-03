@@ -1,0 +1,56 @@
+# Read Event Hub's stream
+conf = {}
+conf["eventhubs.connectionString"] = ""
+
+read_df = (
+  spark
+    .readStream
+    .format("eventhubs")
+    .options(**conf)
+    .load()
+)
+------------------------------------------------------------------------------------------------------------------
+from pyspark.sql.types import *
+import  pyspark.sql.functions as F
+
+# defining the schema
+read_schema = StructType([
+  StructField("source", StringType(), True),
+  StructField("id", StringType(), True),
+  StructField("timestamp", TimestampType(), True),
+  StructField("Export_Unit", DoubleType(), True),
+  StructField("Export_Unit", DoubleType(), True),
+  StructField("battery_current", DoubleType(), True),
+  StructField("solar_KWH", DoubleType(), True),
+  StructField("Grid_VOLTAGE", DoubleType(), True),
+  StructField("turbine_RPM", DoubleType(), True)]
+)
+#capturating in dataframe
+decoded_df = read_df.select(F.from_json(F.col("body").cast("string"), read_schema).alias("payload"))
+
+# writing the stream content to parquet
+query = (
+  decoded_df
+  #  .coalesce(100)
+    .writeStream
+    .format("parquet")
+#    .format("json")
+#    .option("format", "append")
+    .option("path","/tx_stream/cs")
+    .option("checkpointLocation", "/checkpoint_path")
+    .outputMode("append")
+    .start()
+)
+---------------------------------------------------------------------------------------------------------------------
+%scala
+val df = sqlContext.read.parquet("/tx_stream/parquet/data/*").select("payload.source","payload.id","payload.timestamp",
+                                                                     "payload.turbine_RPM","payload.Grid_VOLTAGE","payload.solar_KWH")
+
+display(df)
+--------------------------------------------------------------------------------------------------------------------------
+
+%scala
+df.createOrReplaceTempView("tmpStreamTable")
+spark.sql("create table EventHubStreamTable as select * from tmpStreamTable")
+
+-------------------------------------------------------------------------------------------------------------------------
