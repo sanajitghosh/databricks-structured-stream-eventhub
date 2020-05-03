@@ -1,0 +1,5 @@
+pip install azure-eventhub
+
+pip install azure-storage
+pip install azure-servicebus
+pip install avro
